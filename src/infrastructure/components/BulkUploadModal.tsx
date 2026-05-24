@@ -6,6 +6,8 @@ import { useSubjectStore } from '../store/SubjectStore'
 import { useSessionStore } from '../store/SessionStore'
 import { readFileAsText } from '../parsers/PapaParseWrapper'
 
+const TODAY = new Date().toISOString().slice(0, 10)
+
 interface FileEntry {
   id: string
   file: File
@@ -13,6 +15,7 @@ interface FileEntry {
   subjectId: string
   testId: string
   side: Side
+  measuredAt: string  // YYYY-MM-DD
   note: string
   status: 'pending' | 'processing' | 'done' | 'error'
   errorMsg?: string
@@ -37,7 +40,7 @@ export function BulkUploadModal({ onClose }: Props) {
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [dragging, setDragging] = useState(false)
   const [globalSubjectId, setGlobalSubjectId] = useState('')
-  const [globalTestId] = useState('')
+  const [globalDate, setGlobalDate] = useState(TODAY)
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { upsertSubject } = useSubjectStore()
@@ -51,14 +54,15 @@ export function BulkUploadModal({ onClose }: Props) {
         file,
         fileType: inferFileType(file.name) ?? 'PATH',
         subjectId: globalSubjectId,
-        testId: globalTestId || file.name.replace(/\.(csv)$/i, '').replace(/^(path|angle)_/i, ''),
+        testId: file.name.replace(/\.csv$/i, '').replace(/^(path|angle)_/i, ''),
         side: inferSide(file.name),
+        measuredAt: globalDate,
         note: '',
         status: 'pending',
       }))
       return [...prev, ...newEntries]
     })
-  }, [globalSubjectId, globalTestId])
+  }, [globalSubjectId, globalDate])
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -74,9 +78,12 @@ export function BulkUploadModal({ onClose }: Props) {
     setEntries(prev => prev.filter(e => e.id !== id))
   }, [])
 
-  const applyGlobalSubjectId = () => {
-    if (!globalSubjectId.trim()) return
-    setEntries(prev => prev.map(e => ({ ...e, subjectId: globalSubjectId })))
+  const applyGlobal = () => {
+    setEntries(prev => prev.map(e => ({
+      ...e,
+      ...(globalSubjectId.trim() ? { subjectId: globalSubjectId } : {}),
+      measuredAt: globalDate,
+    })))
   }
 
   // auto-pair preview: group by subjectId+testId+fileType, detect L+R pairs
@@ -88,7 +95,6 @@ export function BulkUploadModal({ onClose }: Props) {
       arr.push(e.id)
       map.set(key, arr)
     }
-    // return Set of ids that are in a valid pair
     const paired = new Set<string>()
     for (const ids of map.values()) {
       if (ids.length === 2) {
@@ -103,7 +109,7 @@ export function BulkUploadModal({ onClose }: Props) {
   }, [entries])
 
   const canSubmit = entries.length > 0
-    && entries.every(e => e.subjectId.trim() && e.testId.trim())
+    && entries.every(e => e.subjectId.trim() && e.testId.trim() && e.measuredAt)
     && !submitting
 
   const handleSubmit = async () => {
@@ -120,7 +126,7 @@ export function BulkUploadModal({ onClose }: Props) {
           testId: entry.testId,
           side: entry.side,
           fileType: entry.fileType,
-          measuredAt: new Date(),
+          measuredAt: new Date(entry.measuredAt),
           note: entry.note || undefined,
         })
         updateEntry(entry.id, { status: 'done', parseWarnings: session.warnings })
@@ -175,23 +181,34 @@ export function BulkUploadModal({ onClose }: Props) {
 
           {/* Global fill */}
           {entries.length > 0 && (
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-gray-500">대상자 ID 일괄 적용</label>
-                <input
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={globalSubjectId}
-                  onChange={e => setGlobalSubjectId(e.target.value)}
-                  placeholder="예: PT001"
-                />
+            <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-semibold text-gray-500">일괄 적용</p>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">대상자 ID</label>
+                  <input
+                    className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    value={globalSubjectId}
+                    onChange={e => setGlobalSubjectId(e.target.value)}
+                    placeholder="예: PT001"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">측정일</label>
+                  <input
+                    type="date"
+                    className="mt-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    value={globalDate}
+                    onChange={e => setGlobalDate(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={applyGlobal}
+                  className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded-lg font-medium text-gray-700 self-end"
+                >
+                  전체 적용
+                </button>
               </div>
-              <button
-                onClick={applyGlobalSubjectId}
-                disabled={!globalSubjectId.trim()}
-                className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded-lg font-medium text-gray-700"
-              >
-                전체 적용
-              </button>
             </div>
           )}
 
@@ -257,12 +274,7 @@ function FileRow({ entry, isPaired, onChange, onRemove }: FileRowProps) {
     error: 'text-red-500',
   }[entry.status]
 
-  const statusIcon = {
-    pending: '○',
-    processing: '◌',
-    done: '✓',
-    error: '✗',
-  }[entry.status]
+  const statusIcon = { pending: '○', processing: '◌', done: '✓', error: '✗' }[entry.status]
 
   return (
     <div className={`rounded-xl border px-4 py-3 ${
@@ -281,6 +293,7 @@ function FileRow({ entry, isPaired, onChange, onRemove }: FileRowProps) {
           <button onClick={onRemove} className="text-gray-300 hover:text-gray-500 text-xs shrink-0">✕</button>
         )}
       </div>
+
       {entry.errorMsg && (
         <div className="mt-1.5 bg-red-50 rounded-lg px-3 py-2">
           <p className="text-xs font-semibold text-red-600">파싱 오류</p>
@@ -310,6 +323,12 @@ function FileRow({ entry, isPaired, onChange, onRemove }: FileRowProps) {
             value={entry.testId}
             onChange={e => onChange({ testId: e.target.value })}
             placeholder="검사 ID *"
+          />
+          <input
+            type="date"
+            className="col-span-2 border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            value={entry.measuredAt}
+            onChange={e => onChange({ measuredAt: e.target.value })}
           />
           <div className="flex gap-1">
             {(['LEFT', 'RIGHT'] as Side[]).map(s => (

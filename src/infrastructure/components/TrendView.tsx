@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   LineChart,
   Line,
@@ -72,6 +72,16 @@ export function TrendView({ sessions }: Props) {
   )
   const [selectedSubject, setSelectedSubject] = useState<string>(subjectIds[0] ?? '')
 
+  // Reset subject when available subjects change (e.g. clearAll)
+  useEffect(() => {
+    if (subjectIds.length === 0) {
+      setSelectedSubject('')
+    } else if (!subjectIds.includes(selectedSubject)) {
+      setSelectedSubject(subjectIds[0])
+      setSelectedGroupKey('')
+    }
+  }, [subjectIds]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Collect testId+fileType groups for selected subject
   const groups = useMemo(() => {
     const map = new Map<string, { testId: string; fileType: 'PATH' | 'ANGLE' }>()
@@ -84,6 +94,15 @@ export function TrendView({ sessions }: Props) {
   }, [sessions, selectedSubject])
 
   const [selectedGroupKey, setSelectedGroupKey] = useState<string>('')
+
+  // Reset group when available groups change
+  useEffect(() => {
+    const validKeys = groups.map(g => `${g.testId}|${g.fileType}`)
+    if (selectedGroupKey && !validKeys.includes(selectedGroupKey)) {
+      setSelectedGroupKey('')
+    }
+  }, [groups]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeGroupKey = selectedGroupKey || (groups[0] ? `${groups[0].testId}|${groups[0].fileType}` : '')
   const activeGroup = groups.find(g => `${g.testId}|${g.fileType}` === activeGroupKey)
 

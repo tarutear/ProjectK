@@ -1,10 +1,25 @@
-import { useState } from 'react'
-import { BulkUploadModal } from './infrastructure/components/BulkUploadModal'
+import { lazy, Suspense, useState } from 'react'
 import { SessionList } from './infrastructure/components/SessionList'
-import { AnalysisView } from './infrastructure/components/AnalysisView'
-import { TrendView } from './infrastructure/components/TrendView'
 import { useSessionStore } from './infrastructure/store/SessionStore'
 import { exportAllJson } from './usecases/ExportData'
+
+const BulkUploadModal = lazy(() =>
+  import('./infrastructure/components/BulkUploadModal').then(m => ({ default: m.BulkUploadModal }))
+)
+const AnalysisView = lazy(() =>
+  import('./infrastructure/components/AnalysisView').then(m => ({ default: m.AnalysisView }))
+)
+const TrendView = lazy(() =>
+  import('./infrastructure/components/TrendView').then(m => ({ default: m.TrendView }))
+)
+
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
 
 type ViewMode = 'analysis' | 'trend'
 
@@ -51,7 +66,7 @@ export default function App() {
         </aside>
 
         <main className="flex-1 overflow-y-auto flex flex-col">
-          {/* View mode tabs */}
+          {/* View mode tabs — only when sessions exist */}
           {sessions.length > 0 && (
             <div className="border-b border-gray-200 bg-white px-6 flex gap-4 shrink-0">
               <button
@@ -78,30 +93,36 @@ export default function App() {
           )}
 
           <div className="flex-1 overflow-y-auto p-6">
-            {viewMode === 'trend' ? (
-              <TrendView sessions={sessions} />
-            ) : selectedSession ? (
-              <AnalysisView session={selectedSession} pairedSession={pairedSession ?? undefined} />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="text-6xl mb-4">📊</div>
-                <h2 className="text-lg font-medium text-gray-700 mb-2">분석할 파일을 선택하세요</h2>
-                <p className="text-sm text-gray-400 mb-6">
-                  CSV 파일을 업로드하거나 왼쪽 목록에서 세션을 선택하세요
-                </p>
-                <button
-                  onClick={() => setShowUpload(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg"
-                >
-                  파일 업로드
-                </button>
-              </div>
-            )}
+            <Suspense fallback={<Spinner />}>
+              {viewMode === 'trend' ? (
+                <TrendView sessions={sessions} />
+              ) : selectedSession ? (
+                <AnalysisView session={selectedSession} pairedSession={pairedSession ?? undefined} />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="text-6xl mb-4">📊</div>
+                  <h2 className="text-lg font-medium text-gray-700 mb-2">분석할 파일을 선택하세요</h2>
+                  <p className="text-sm text-gray-400 mb-6">
+                    CSV 파일을 업로드하거나 왼쪽 목록에서 세션을 선택하세요
+                  </p>
+                  <button
+                    onClick={() => setShowUpload(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg"
+                  >
+                    파일 업로드
+                  </button>
+                </div>
+              )}
+            </Suspense>
           </div>
         </main>
       </div>
 
-      {showUpload && <BulkUploadModal onClose={() => setShowUpload(false)} />}
+      {showUpload && (
+        <Suspense fallback={null}>
+          <BulkUploadModal onClose={() => setShowUpload(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }
