@@ -10,6 +10,7 @@ interface SessionState {
   selectedSessionId: string | null
   addSession: (rawCsv: string, subject: SubjectInfo, testInfo: TestInfo) => MarkerSession
   removeSession: (id: string) => void
+  clearAll: () => void
   selectSession: (id: string | null) => void
   getSession: (id: string) => MarkerSession | undefined
   getPair: (session: MarkerSession) => MarkerSession | undefined
@@ -25,6 +26,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ sessions: updated })
     return updated.find(s => s.id === newSession.id)!
   },
+
+  clearAll: () => set({ sessions: [], selectedSessionId: null }),
 
   removeSession: (id) => {
     const remaining = get().sessions.filter(s => s.id !== id)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UploadModal } from './infrastructure/components/UploadModal'
+import { BulkUploadModal } from './infrastructure/components/BulkUploadModal'
 import { SessionList } from './infrastructure/components/SessionList'
 import { AnalysisView } from './infrastructure/components/AnalysisView'
 import { useSessionStore } from './infrastructure/store/SessionStore'
@@ -56,7 +56,7 @@ export default function App() {
         </main>
       </div>
 
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
+      {showUpload && <BulkUploadModal onClose={() => setShowUpload(false)} />}
     </div>
   )
 }

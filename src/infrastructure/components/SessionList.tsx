@@ -25,8 +25,9 @@ function PairingBadge({ paired }: { paired: boolean }) {
 }
 
 export function SessionList({ sessions, selectedId, onSelect, onAddOpposite }: Props) {
-  const { removeSession } = useSessionStore()
+  const { removeSession, clearAll } = useSessionStore()
   const grouped = groupBySubject(sessions)
+  const pairedCount = sessions.filter(s => s.pairedSessionId).length / 2
 
   if (sessions.length === 0) {
     return (
@@ -38,6 +39,18 @@ export function SessionList({ sessions, selectedId, onSelect, onAddOpposite }: P
 
   return (
     <div className="p-3 space-y-4">
+      {/* summary bar */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-xs text-gray-400">
+          {sessions.length}개 세션{pairedCount > 0 ? ` · ${pairedCount}쌍` : ''}
+        </span>
+        <button
+          onClick={() => { if (confirm('모든 세션을 삭제할까요?')) clearAll() }}
+          className="text-xs text-red-400 hover:text-red-600"
+        >
+          전체 삭제
+        </button>
+      </div>
       {Object.entries(grouped).map(([subjectId, group]) => (
         <div key={subjectId}>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1 mb-1">
