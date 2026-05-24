@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
 import type { FileType, Side } from '../../domain/models/TestInfo'
 import { inferFileType } from '../../domain/models/TestInfo'
+import type { ParseWarning } from '../../domain/models/MarkerSession'
 import { useSubjectStore } from '../store/SubjectStore'
 import { useSessionStore } from '../store/SessionStore'
 import { readFileAsText } from '../parsers/PapaParseWrapper'
@@ -15,6 +16,7 @@ interface FileEntry {
   note: string
   status: 'pending' | 'processing' | 'done' | 'error'
   errorMsg?: string
+  parseWarnings?: ParseWarning[]
 }
 
 function inferSide(filename: string): Side {
@@ -121,7 +123,7 @@ export function BulkUploadModal({ onClose }: Props) {
           measuredAt: new Date(),
           note: entry.note || undefined,
         })
-        updateEntry(entry.id, { status: 'done' })
+        updateEntry(entry.id, { status: 'done', parseWarnings: session.warnings })
         lastId = session.id
       } catch (err) {
         updateEntry(entry.id, { status: 'error', errorMsg: err instanceof Error ? err.message : '오류' })
@@ -279,7 +281,20 @@ function FileRow({ entry, isPaired, onChange, onRemove }: FileRowProps) {
           <button onClick={onRemove} className="text-gray-300 hover:text-gray-500 text-xs shrink-0">✕</button>
         )}
       </div>
-      {entry.errorMsg && <p className="text-xs text-red-600 mt-1">{entry.errorMsg}</p>}
+      {entry.errorMsg && (
+        <div className="mt-1.5 bg-red-50 rounded-lg px-3 py-2">
+          <p className="text-xs font-semibold text-red-600">파싱 오류</p>
+          <p className="text-xs text-red-500 mt-0.5">{entry.errorMsg}</p>
+        </div>
+      )}
+      {entry.parseWarnings && entry.parseWarnings.length > 0 && (
+        <div className="mt-1.5 bg-amber-50 rounded-lg px-3 py-2 space-y-0.5">
+          <p className="text-xs font-semibold text-amber-700">⚠ 파싱 경고 {entry.parseWarnings.length}건</p>
+          {entry.parseWarnings.map((w, i) => (
+            <p key={i} className="text-xs text-amber-600">• {w.message}</p>
+          ))}
+        </div>
+      )}
 
       {/* Row 2: editable fields */}
       {entry.status !== 'done' && (
