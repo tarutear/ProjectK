@@ -115,6 +115,7 @@ export function BulkUploadModal({ onClose }: Props) {
   const handleSubmit = async () => {
     setSubmitting(true)
     let lastId: string | null = null
+    let hasError = false
 
     for (const entry of entries) {
       if (entry.status === 'done') continue
@@ -133,14 +134,14 @@ export function BulkUploadModal({ onClose }: Props) {
         lastId = session.id
       } catch (err) {
         updateEntry(entry.id, { status: 'error', errorMsg: err instanceof Error ? err.message : '오류' })
+        hasError = true
       }
     }
 
     setSubmitting(false)
     if (lastId) selectSession(lastId)
-    if (entries.every(e => e.status === 'done' || e.status === 'error')) {
-      setTimeout(onClose, 600)
-    }
+    // Close after all entries processed. If there were errors, stay open briefly so user sees them.
+    setTimeout(onClose, hasError ? 1500 : 600)
   }
 
   return (
