@@ -12,6 +12,9 @@ const AnalysisView = lazy(() =>
 const TrendView = lazy(() =>
   import('./infrastructure/components/TrendView').then(m => ({ default: m.TrendView }))
 )
+const SubjectDashboard = lazy(() =>
+  import('./infrastructure/components/SubjectDashboard').then(m => ({ default: m.SubjectDashboard }))
+)
 
 function Spinner() {
   return (
@@ -21,11 +24,12 @@ function Spinner() {
   )
 }
 
-type ViewMode = 'analysis' | 'trend'
+type ViewMode = 'subject' | 'analysis' | 'trend'
 
 export default function App() {
   const [showUpload, setShowUpload] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('analysis')
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const { sessions, selectedSessionId, selectSession, getSession, getPair } = useSessionStore()
   const selectedSession = selectedSessionId ? getSession(selectedSessionId) : null
   const pairedSession = selectedSession ? getPair(selectedSession) : null
@@ -60,7 +64,9 @@ export default function App() {
           <SessionList
             sessions={sessions}
             selectedId={selectedSessionId}
+            selectedSubjectId={selectedSubjectId}
             onSelect={(id) => { selectSession(id); setViewMode('analysis') }}
+            onSelectSubject={(id) => { setSelectedSubjectId(id); setViewMode('subject') }}
             onAddOpposite={() => setShowUpload(true)}
           />
         </aside>
@@ -69,6 +75,16 @@ export default function App() {
           {/* View mode tabs — only when sessions exist */}
           {sessions.length > 0 && (
             <div className="border-b border-gray-200 bg-white px-6 flex gap-4 shrink-0">
+              <button
+                onClick={() => setViewMode('subject')}
+                className={`text-sm py-3 font-medium border-b-2 transition-colors ${
+                  viewMode === 'subject'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                대상자 분석
+              </button>
               <button
                 onClick={() => setViewMode('analysis')}
                 className={`text-sm py-3 font-medium border-b-2 transition-colors ${
@@ -94,7 +110,13 @@ export default function App() {
 
           <div className="flex-1 overflow-y-auto p-6">
             <Suspense fallback={<Spinner />}>
-              {viewMode === 'trend' ? (
+              {viewMode === 'subject' && selectedSubjectId ? (
+                <SubjectDashboard subjectId={selectedSubjectId} sessions={sessions} />
+              ) : viewMode === 'subject' ? (
+                <div className="flex flex-col items-center justify-center h-full text-center text-gray-400">
+                  <p className="text-sm">왼쪽 목록에서 대상자를 선택하세요.</p>
+                </div>
+              ) : viewMode === 'trend' ? (
                 <TrendView sessions={sessions} />
               ) : selectedSession ? (
                 <AnalysisView session={selectedSession} pairedSession={pairedSession ?? undefined} />

@@ -4,7 +4,9 @@ import { useSessionStore } from '../store/SessionStore'
 interface Props {
   sessions: MarkerSession[]
   selectedId: string | null
+  selectedSubjectId: string | null
   onSelect: (id: string) => void
+  onSelectSubject: (subjectId: string) => void
   onAddOpposite: () => void
 }
 
@@ -24,7 +26,7 @@ function PairingBadge({ paired }: { paired: boolean }) {
   )
 }
 
-export function SessionList({ sessions, selectedId, onSelect, onAddOpposite }: Props) {
+export function SessionList({ sessions, selectedId, selectedSubjectId, onSelect, onSelectSubject, onAddOpposite }: Props) {
   const { removeSession, clearAll } = useSessionStore()
   const grouped = groupBySubject(sessions)
   const pairedCount = sessions.filter(s => s.pairedSessionId).length / 2
@@ -53,9 +55,14 @@ export function SessionList({ sessions, selectedId, onSelect, onAddOpposite }: P
       </div>
       {Object.entries(grouped).map(([subjectId, group]) => (
         <div key={subjectId}>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1 mb-1">
+          <button
+            onClick={() => onSelectSubject(subjectId)}
+            className={`w-full text-left text-xs font-semibold uppercase tracking-wide px-1 mb-1 py-0.5 rounded hover:text-blue-600 transition-colors ${
+              selectedSubjectId === subjectId ? 'text-blue-600' : 'text-gray-500'
+            }`}
+          >
             {subjectId}
-          </p>
+          </button>
           <div className="space-y-1">
             {group.map(session => {
               const isPaired = !!session.pairedSessionId
