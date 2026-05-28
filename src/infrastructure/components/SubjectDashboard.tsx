@@ -14,21 +14,19 @@ interface Props {
   sessions: MarkerSession[]
 }
 
+// Group by fileType only — L and R with different testIds still appear in the same card
 interface TestGroup {
-  testId: string
   fileType: 'PATH' | 'ANGLE'
   sessions: MarkerSession[]
 }
 
 function groupSessions(sessions: MarkerSession[]): TestGroup[] {
-  const map = new Map<string, TestGroup>()
-  for (const s of sessions) {
-    const key = `${s.test.testId}|${s.test.fileType}`
-    const g = map.get(key) ?? { testId: s.test.testId, fileType: s.test.fileType, sessions: [] }
-    g.sessions.push(s)
-    map.set(key, g)
-  }
-  return Array.from(map.values())
+  const path = sessions.filter(s => s.test.fileType === 'PATH')
+  const angle = sessions.filter(s => s.test.fileType === 'ANGLE')
+  const result: TestGroup[] = []
+  if (path.length > 0) result.push({ fileType: 'PATH', sessions: path })
+  if (angle.length > 0) result.push({ fileType: 'ANGLE', sessions: angle })
+  return result
 }
 
 function AIBadge({ ai }: { ai: number | null }) {
@@ -69,6 +67,32 @@ function fmtMs(ms: number) {
   return (ms / 1000).toFixed(2)
 }
 
+function SessionSelect({
+  options,
+  value,
+  onChange,
+  side,
+}: {
+  options: MarkerSession[]
+  value: string
+  onChange: (id: string) => void
+  side: 'LEFT' | 'RIGHT'
+}) {
+  if (options.length <= 1) return null
+  const color = side === 'LEFT' ? 'text-blue-700 border-blue-200' : 'text-red-600 border-red-200'
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className={`text-xs border rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${color}`}
+    >
+      {options.map(s => (
+        <option key={s.id} value={s.id}>{s.test.testId}</option>
+      ))}
+    </select>
+  )
+}
+
 function TestCard({ group }: { group: TestGroup }) {
   const dates = useMemo(() => {
     const set = new Set<string>()
@@ -80,19 +104,41 @@ function TestCard({ group }: { group: TestGroup }) {
 
   const [selectedDate, setSelectedDate] = useState(dates[dates.length - 1] ?? '')
 
+  // Sessions for selected date
+  const dateSessions = useMemo(
+    () => group.sessions.filter(s => s.test.measuredAt.toISOString().slice(0, 10) === selectedDate),
+    [group.sessions, selectedDate],
+  )
+
+  const leftOptions = useMemo(() => dateSessions.filter(s => s.test.side === 'LEFT'), [dateSessions])
+  const rightOptions = useMemo(() => dateSessions.filter(s => s.test.side === 'RIGHT'), [dateSessions])
+
+  const [selectedLeftId, setSelectedLeftId] = useState(leftOptions[0]?.id ?? '')
+  const [selectedRightId, setSelectedRightId] = useState(rightOptions[0]?.id ?? '')
+
+  // Reset L/R selection when date or sessions change
   useEffect(() => {
     if (dates.length > 0 && !dates.includes(selectedDate)) {
       setSelectedDate(dates[dates.length - 1])
     }
   }, [dates]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dateSessions = useMemo(
-    () => group.sessions.filter(s => s.test.measuredAt.toISOString().slice(0, 10) === selectedDate),
-    [group.sessions, selectedDate],
-  )
+  useEffect(() => {
+    setSelectedLeftId(leftOptions[0]?.id ?? '')
+  }, [selectedDate, leftOptions.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const leftSession = dateSessions.find(s => s.test.side === 'LEFT')
-  const rightSession = dateSessions.find(s => s.test.side === 'RIGHT')
+  useEffect(() => {
+    setSelectedRightId(rightOptions[0]?.id ?? '')
+  }, [selectedDate, rightOptions.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const leftSession = useMemo(
+    () => group.sessions.find(s => s.id === selectedLeftId),
+    [group.sessions, selectedLeftId],
+  )
+  const rightSession = useMemo(
+    () => group.sessions.find(s => s.id === selectedRightId),
+    [group.sessions, selectedRightId],
+  )
 
   const leftAnalysis = useMemo(
     () => (leftSession ? analyzeSingle(leftSession) : null),
@@ -138,26 +184,23 @@ function TestCard({ group }: { group: TestGroup }) {
   }, [rightSession])
 
   const ai = asymmetry?.asymmetry.ai ?? null
+  const hasSession = !!(leftSession || rightSession)
 
   const handleExport = () => {
-    if (leftSession && rightSession) {
-      exportSummaryCsv(leftSession, rightSession)
-    } else if (leftSession) {
-      exportSummaryCsv(leftSession)
-    } else if (rightSession) {
-      exportSummaryCsv(rightSession)
-    }
+    if (leftSession && rightSession) exportSummaryCsv(leftSession, rightSession)
+    else if (leftSession) exportSummaryCsv(leftSession)
+    else if (rightSession) exportSummaryCsv(rightSession)
   }
-
-  const hasSession = !!(leftSession || rightSession)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       {/* Card header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <span className="text-sm font-semibold text-gray-900">{group.testId}</span>
-          <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-900">
+            {group.fileType === 'PATH' ? '경로 분석' : '관절각 분석'}
+          </span>
+          <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
             {group.fileType}
           </span>
         </div>
@@ -168,9 +211,7 @@ function TestCard({ group }: { group: TestGroup }) {
               onChange={e => setSelectedDate(e.target.value)}
               className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {dates.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
+              {dates.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           ) : (
             <span className="text-xs text-gray-400">{selectedDate}</span>
@@ -187,7 +228,55 @@ function TestCard({ group }: { group: TestGroup }) {
         </div>
       </div>
 
-      {/* Side warnings */}
+      {/* L/R session selectors (shown when multiple options exist for the same side) */}
+      {(leftOptions.length > 1 || rightOptions.length > 1) && (
+        <div className="flex gap-3 bg-gray-50 rounded-lg px-3 py-2.5 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-blue-700 w-8">좌 (L)</span>
+            {leftOptions.length > 0 ? (
+              <SessionSelect
+                options={leftOptions}
+                value={selectedLeftId}
+                onChange={setSelectedLeftId}
+                side="LEFT"
+              />
+            ) : (
+              <span className="text-xs text-gray-400">없음</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-red-600 w-8">우 (R)</span>
+            {rightOptions.length > 0 ? (
+              <SessionSelect
+                options={rightOptions}
+                value={selectedRightId}
+                onChange={setSelectedRightId}
+                side="RIGHT"
+              />
+            ) : (
+              <span className="text-xs text-gray-400">없음</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected session labels */}
+      {(leftSession || rightSession) && (
+        <div className="flex gap-4 text-xs text-gray-400">
+          {leftSession && (
+            <span>
+              <span className="font-semibold text-blue-600">L</span> {leftSession.test.testId}
+            </span>
+          )}
+          {rightSession && (
+            <span>
+              <span className="font-semibold text-red-500">R</span> {rightSession.test.testId}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Missing side warnings */}
       {hasSession && !leftSession && (
         <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           ⚠ 좌측(L) 데이터 없음 — 비대칭 분석 불가
@@ -315,8 +404,6 @@ export function SubjectDashboard({ subjectId, sessions }: Props) {
 
   const groups = useMemo(() => groupSessions(subjectSessions), [subjectSessions])
 
-  const pairedCount = subjectSessions.filter(s => s.pairedSessionId).length / 2
-
   const saveNote = () => {
     upsertSubject({ subjectId, ...(subject ?? {}), note: noteText.trim() || undefined })
     setEditNote(false)
@@ -338,8 +425,9 @@ export function SubjectDashboard({ subjectId, sessions }: Props) {
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-gray-900">{subjectId}</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              {subjectSessions.length}개 세션 · {groups.length}개 검사 항목
-              {pairedCount > 0 ? ` · ${pairedCount}쌍` : ''}
+              {subjectSessions.length}개 세션 ·{' '}
+              {subjectSessions.filter(s => s.test.side === 'LEFT').length}개 좌측 ·{' '}
+              {subjectSessions.filter(s => s.test.side === 'RIGHT').length}개 우측
             </p>
           </div>
         </div>
@@ -386,7 +474,7 @@ export function SubjectDashboard({ subjectId, sessions }: Props) {
 
       {/* Test cards */}
       {groups.map(group => (
-        <TestCard key={`${group.testId}|${group.fileType}`} group={group} />
+        <TestCard key={group.fileType} group={group} />
       ))}
     </div>
   )
