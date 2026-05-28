@@ -4,7 +4,7 @@ import { analyzeSingle } from '../../usecases/AnalyzeSingle'
 import { analyzeAsymmetry } from '../../usecases/AnalyzeAsymmetry'
 import { exportSummaryCsv, exportFramesCsv } from '../../usecases/ExportData'
 import { toTrajectoryData } from '../../adapters/presenters/TrajectoryPresenter'
-import { TrajectoryChart, ProfileChart } from './TrajectoryChart'
+import { TrajectoryChart, ProfileChart, DualProfileChart } from './TrajectoryChart'
 import { AsymmetryDashboard } from './AsymmetryDashboard'
 import { SummaryCard } from './SummaryCard'
 import { calcSpeedProfile } from '../../domain/metrics/PathMetrics'
@@ -99,6 +99,15 @@ export function AnalysisView({ session, pairedSession }: Props) {
     }))
   }, [session])
 
+  const pairedSpeedData = useMemo(() => {
+    if (!pairedSession || pairedSession.test.fileType !== 'PATH') return []
+    const frames = pairedSession.frames as PathFrame[]
+    return calcSpeedProfile(frames).map((v, i) => ({
+      timeMs: frames[i + 1].timeMs,
+      value: v,
+    }))
+  }, [pairedSession])
+
   const angularVelocityData = useMemo(() => {
     if (session.test.fileType !== 'ANGLE') return []
     const frames = session.frames as AngleFrame[]
@@ -107,6 +116,15 @@ export function AnalysisView({ session, pairedSession }: Props) {
       value: v,
     }))
   }, [session])
+
+  const pairedAngularVelocityData = useMemo(() => {
+    if (!pairedSession || pairedSession.test.fileType !== 'ANGLE') return []
+    const frames = pairedSession.frames as AngleFrame[]
+    return calcAngularVelocity(frames).map((v, i) => ({
+      timeMs: frames[i + 1].timeMs,
+      value: v,
+    }))
+  }, [pairedSession])
 
   const sideLabel = session.test.side === 'LEFT' ? '좌측 (L)' : '우측 (R)'
 
@@ -165,13 +183,31 @@ export function AnalysisView({ session, pairedSession }: Props) {
 
       {/* Speed / Angle profile */}
       {session.test.fileType === 'PATH' && speedData.length > 0 && (
-        <Section title="속도 프로파일">
-          <ProfileChart data={speedData} label="속도" unit="cm/s" color="#3b82f6" />
+        <Section title={pairedSession ? '속도 프로파일 (L/R 비교)' : '속도 프로파일'}>
+          {pairedSession && pairedSpeedData.length > 0 ? (
+            <DualProfileChart
+              leftData={session.test.side === 'LEFT' ? speedData : pairedSpeedData}
+              rightData={session.test.side === 'RIGHT' ? speedData : pairedSpeedData}
+              label="속도"
+              unit="cm/s"
+            />
+          ) : (
+            <ProfileChart data={speedData} label="속도" unit="cm/s" color="#3b82f6" />
+          )}
         </Section>
       )}
       {session.test.fileType === 'ANGLE' && angularVelocityData.length > 0 && (
-        <Section title="각속도 프로파일">
-          <ProfileChart data={angularVelocityData} label="각속도" unit="°/s" color="#8b5cf6" />
+        <Section title={pairedSession ? '각속도 프로파일 (L/R 비교)' : '각속도 프로파일'}>
+          {pairedSession && pairedAngularVelocityData.length > 0 ? (
+            <DualProfileChart
+              leftData={session.test.side === 'LEFT' ? angularVelocityData : pairedAngularVelocityData}
+              rightData={session.test.side === 'RIGHT' ? angularVelocityData : pairedAngularVelocityData}
+              label="각속도"
+              unit="°/s"
+            />
+          ) : (
+            <ProfileChart data={angularVelocityData} label="각속도" unit="°/s" color="#8b5cf6" />
+          )}
         </Section>
       )}
 
