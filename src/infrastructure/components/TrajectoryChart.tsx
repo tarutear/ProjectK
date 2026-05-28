@@ -36,8 +36,8 @@ export function TrajectoryChart({ data, fileType, height = 320 }: Props) {
       <ResponsiveContainer width="100%" height={height}>
         <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis type="number" dataKey="x" domain={xDomain} unit="cm" tick={{ fontSize: 11 }} />
-          <YAxis type="number" dataKey="y" domain={yDomain} unit="cm" tick={{ fontSize: 11 }} width={48} />
+          <XAxis type="number" dataKey="x" domain={xDomain} tickFormatter={(v: number) => `${Number(v).toFixed(1)}cm`} tick={{ fontSize: 11 }} />
+          <YAxis type="number" dataKey="y" domain={yDomain} tickFormatter={(v: number) => `${Number(v).toFixed(1)}cm`} tick={{ fontSize: 11 }} width={56} />
           <Tooltip formatter={cmFormatter} contentStyle={{ fontSize: 12 }} />
           {leftData.length > 0 && (
             <Scatter name="좌측 (L)" data={leftData} line={{ stroke: '#3b82f6', strokeWidth: 2 }} fill="#3b82f6" r={0} />
@@ -70,8 +70,8 @@ export function TrajectoryChart({ data, fileType, height = 320 }: Props) {
     <ResponsiveContainer width="100%" height={height}>
       <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis type="number" dataKey="x" domain={xDomain} unit="cm" tick={{ fontSize: 11 }} />
-        <YAxis type="number" dataKey="y" domain={yDomain} unit="cm" tick={{ fontSize: 11 }} width={48} />
+        <XAxis type="number" dataKey="x" domain={xDomain} tickFormatter={(v: number) => `${Number(v).toFixed(1)}cm`} tick={{ fontSize: 11 }} />
+        <YAxis type="number" dataKey="y" domain={yDomain} tickFormatter={(v: number) => `${Number(v).toFixed(1)}cm`} tick={{ fontSize: 11 }} width={56} />
         <Tooltip formatter={cmFormatter} contentStyle={{ fontSize: 12 }} />
         {leftEnd.length > 0 && (
           <Scatter name="좌측 End (L)" data={leftEnd} line={{ stroke: '#3b82f6', strokeWidth: 2 }} fill="#3b82f6" r={0} />
